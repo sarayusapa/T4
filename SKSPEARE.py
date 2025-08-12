@@ -189,14 +189,13 @@ def generate_text(model, vocab, seed_text="To be or not to be",
     # Process seed text
     seed_words = seed_text.lower().split()
     
-    # Check if seed words are in vocabulary
+    # Check if seed words are in vocabulary - NO WARNINGS, just fix silently
     valid_seed_words = []
     for word in seed_words:
         if word in vocab.word2idx:
             valid_seed_words.append(word)
         else:
-            print(f"Warning: '{word}' not in vocabulary, trying alternatives...")
-            # Try to find similar words or use common words
+            # Silently use common alternatives
             alternatives = ['the', 'and', 'to', 'of', 'a', 'in', 'that', 'is']
             for alt in alternatives:
                 if alt in vocab.word2idx:
@@ -205,8 +204,6 @@ def generate_text(model, vocab, seed_text="To be or not to be",
     
     if not valid_seed_words:
         valid_seed_words = ['the']  # Fallback to common word
-    
-    print(f"Using seed: {' '.join(valid_seed_words)}")
     
     # Convert to indices
     current_sequence = vocab.words_to_indices(valid_seed_words)
@@ -302,7 +299,7 @@ def main():
     # Generate text with different seeds
     shakespeare_seeds = [
         "To be or not to be",
-        "What light through yonder window breaks",
+        "What light through yonder window breaks", 
         "Fair is foul and foul is fair",
         "Now is the winter of our discontent",
         "All the world's a stage"
@@ -318,7 +315,6 @@ def main():
         generated = generate_text(model, vocab, seed, max_length=100, 
                                 temperature=0.8, top_k=10, device=device)
         print(generated)
-        print()
 
 if __name__ == "__main__":
     main()
