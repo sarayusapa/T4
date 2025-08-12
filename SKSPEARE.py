@@ -17,17 +17,9 @@ distinct_words = sorted(list(set(words)))  # vocabulary
 
 # Ensure PAD and UNK tokens exist in vocab (important for padding and unknown words)
 # Keep order deterministic: put PAD and UNK at the front if they don't exist
-special_tokens = []
-if '<PAD>' not in distinct_words:
-    special_tokens.append('<PAD>')
-if '<UNK>' not in distinct_words:
-    special_tokens.append('<UNK>')
-if special_tokens:
-    distinct_words = special_tokens + distinct_words
-
-word_to_idx = {word: i for i, word in enumerate(distinct_words)}
-idx_to_word = {i: word for i, word in enumerate(distinct_words)}
-
+sspecial_tokens = ['<PAD>', '<UNK>']
+distinct_words = [w for w in distinct_words if w not in special_tokens]
+distinct_words = special_tokens + distinct_words
 # Define constants
 N_seq = 50
 N_words = len(words)
@@ -69,7 +61,8 @@ model = LSTMModel(vocab_size=N_vocab, embedding_dim=embedding_dim, hidden_size=h
 
 # -------------------- Training Setup --------------------
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-criterion = nn.CrossEntropyLoss()
+pad_idx = word_to_idx['<PAD>']
+criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
 
 PATH_SAVE = "shakespearean_generator_2.pth"
 
@@ -118,9 +111,12 @@ for epoch in range(num_epochs):
     if epoch_loss < best_loss:
         best_loss = epoch_loss
         save_checkpoint(model, optimizer, epoch, best_loss)
-
+def sample_with_temperature(logits, temperature=1.0):
+    """Sample an index from logits using temperature scaling."""
+    probs = F.softmax(logits / temperature, dim=1)
+    return torch.multinomial(probs, 1).item()
 # -------------------- Text Generation --------------------
-def generate(seed_words, N_words):
+def generate(seed_words, N_words,temperature=1.0):
     """
     seed_words: list of initial words (strings), already padded/truncated to length <= N_seq
     N_words: number of new words to generate
@@ -145,8 +141,7 @@ def generate(seed_words, N_words):
         x_tensor = torch.tensor([x0], dtype=torch.long).to(device)  # shape (1, N_seq)
         with torch.no_grad():
             logits = model(x_tensor)  # (1, N_vocab)
-            probs = F.softmax(logits, dim=1).cpu().numpy().ravel()
-        idx = np.random.choice(N_vocab, p=probs)
+            idx = sample_with_temperature(logits, temperature)
         generated_indices.append(int(idx))
         x0 = x0[1:] + [int(idx)]
 
@@ -177,7 +172,8 @@ seed_words = [pad_token] * N_pad + seed_words
 print("The seed words are:", seed_words)
 
 # -------------------- Generate Output --------------------
-generated_indices = generate(seed_words, 500)[N_pad:]  # Remove the prepended padding, if any
+generated_indices = generate(seed_words, 500, temperature=0.8)[N_pad:]
+  # Remove the prepended padding, if any
 generated_sentence = ' '.join([idx_to_word[i] for i in generated_indices])
 print(generated_sentence)
 
@@ -188,3 +184,4 @@ reloaded_model = LSTMModel(N_vocab, embedding_dim, hidden_size, N_vocab, num_lay
 reloaded_model.load_state_dict(torch.load('shakespeare_final.pth', map_location=device))
 reloaded_model.to(device)
 reloaded_model.eval()
+
