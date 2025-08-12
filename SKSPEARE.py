@@ -15,9 +15,15 @@ data = load_data()
 words = data.split()
 distinct_words = sorted(list(set(words)))  # vocabulary
 
-# Ensure PAD token exists in vocab (important for padding)
+# Ensure PAD and UNK tokens exist in vocab (important for padding and unknown words)
+# Keep order deterministic: put PAD and UNK at the front if they don't exist
+special_tokens = []
 if '<PAD>' not in distinct_words:
-    distinct_words = ['<PAD>'] + distinct_words  # add PAD at index 0
+    special_tokens.append('<PAD>')
+if '<UNK>' not in distinct_words:
+    special_tokens.append('<UNK>')
+if special_tokens:
+    distinct_words = special_tokens + distinct_words
 
 word_to_idx = {word: i for i, word in enumerate(distinct_words)}
 idx_to_word = {i: word for i, word in enumerate(distinct_words)}
@@ -121,15 +127,13 @@ def generate(seed_words, N_words):
     Returns: list of generated word indices (including seed indices at start)
     """
     model.eval()
-    # convert seed words to indices; raise if unknown
-    try:
-        x0 = [word_to_idx[word] for word in seed_words]
-    except KeyError as e:
-        raise KeyError(f"Seed contains unknown word: {e}")
+
+    # Map seed words to indices, replacing unknown words with '<UNK>' index
+    unk_idx = word_to_idx.get('<UNK>')
+    x0 = [word_to_idx.get(w, unk_idx) for w in seed_words]
 
     # Ensure window length is exactly N_seq
     if len(x0) < N_seq:
-        # pad on left with pad token index
         pad_idx = word_to_idx['<PAD>']
         x0 = [pad_idx] * (N_seq - len(x0)) + x0
     elif len(x0) > N_seq:
@@ -152,12 +156,14 @@ def generate(seed_words, N_words):
 initial_seed = "your awesome character is very powerful today".lower()
 seed_words = initial_seed.split()
 
-# Ensure all words are in the vocabulary
+# Replace any words not in vocabulary with '<UNK>' (instead of raising)
 words_input = set(seed_words)
 words_valid = set(word_to_idx.keys())
 invalid_words = words_input.difference(words_valid)
 if invalid_words:
-    raise SyntaxError(f"Input contains invalid words: {invalid_words}")
+    # map unknown words to <UNK> (do not fail)
+    print("Warning: these seed words are not in vocab and will be replaced with <UNK>:", invalid_words)
+    seed_words = [w if w in word_to_idx else '<UNK>' for w in seed_words]
 
 # Truncate long sequences
 if len(seed_words) > N_seq:
