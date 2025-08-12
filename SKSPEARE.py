@@ -123,7 +123,7 @@ def train_model(model, train_loader, num_epochs=30, lr=0.001, device='cuda'):
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss(ignore_index=0)  # Ignore <UNK> in loss calculation
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', 
-                                                   factor=0.5, patience=3, verbose=True)
+                                                   factor=0.5, patience=3)
     
     best_loss = float('inf')
     patience_counter = 0
